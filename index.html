@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Green Horizon — Egg Farming Profitability Ledger</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#1B3B2F">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --forest:#1B3B2F;
+    --forest-deep:#122A21;
+    --cream:#FAF6EC;
+    --paper:#FFFFFF;
+    --amber:#D9A441;
+    --amber-deep:#B8842A;
+    --rust:#8C5A3C;
+    --ink:#2A2A22;
+    --ink-soft:#5B5A4E;
+    --line:#E4DDC9;
+    --bad:#B0453B;
+    --good:#3F6E4C;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:15px;
+    line-height:1.5;
+  }
+  h1,h2,h3{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    margin:0;
+    color:var(--forest-deep);
+  }
+  .mono{font-family:'IBM Plex Mono', monospace;}
+
+  /* ===== Top bar ===== */
+  header{
+    background:var(--forest);
+    color:var(--cream);
+    padding:22px 32px;
+    display:flex;
+    align-items:baseline;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  header h1{color:var(--cream); font-size:26px; letter-spacing:0.2px;}
+  header .tag{color:#B9CBB9; font-size:14px; font-style:italic;}
+  header .spacer{flex:1;}
+  header .month-input{display:flex; align-items:center; gap:8px; font-size:13px; color:#CFE0CF;}
+  header input[type=number]{
+    width:64px; padding:5px 6px; border-radius:4px; border:1px solid #3E5D4F;
+    background:#0F241C; color:var(--cream); font-family:'IBM Plex Mono',monospace;
+  }
+  header button{
+    background:var(--amber); color:var(--forest-deep); border:none; border-radius:4px;
+    padding:8px 16px; font-weight:600; font-size:13px; cursor:pointer;
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+  header button:hover{background:var(--amber-deep); color:var(--cream);}
+
+  /* ===== Layout ===== */
+  .layout{display:flex; align-items:flex-start;}
+  aside{
+    width:320px; min-width:320px;
+    background:var(--paper);
+    border-right:1px solid var(--line);
+    padding:24px 20px 80px 20px;
+    height:calc(100vh - 78px);
+    overflow-y:auto;
+    position:sticky; top:0;
+  }
+  main{flex:1; padding:28px 32px 80px 32px; min-width:0;}
+
+  .field-group{margin-bottom:22px;}
+  .field-group > h3{
+    font-size:12px; text-transform:uppercase; letter-spacing:0.6px;
+    color:var(--rust); font-family:'IBM Plex Sans',sans-serif; font-weight:600;
+    border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:10px;
+  }
+  .field{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;}
+  .field label{font-size:12.5px; color:var(--ink-soft); flex:1; line-height:1.3;}
+  .field input{
+    width:96px; padding:5px 7px; border:1px solid var(--line); border-radius:4px;
+    font-family:'IBM Plex Mono',monospace; font-size:13px; text-align:right;
+    background:#FCFAF3;
+  }
+  .field input:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+
+  details.laycurve summary{
+    cursor:pointer; font-size:12.5px; color:var(--rust); font-weight:600; margin:6px 0;
+  }
+  details.laycurve .field input{width:60px;}
+
+  /* ===== Summary strip ===== */
+  .summary-strip{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+    gap:1px; background:var(--line);
+    border:1px solid var(--line); margin-bottom:26px;
+  }
+  .summary-cell{background:var(--paper); padding:16px 18px;}
+  .summary-cell .label{font-size:11.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.4px;}
+  .summary-cell .value{font-family:'Source Serif 4',serif; font-size:22px; font-weight:600; color:var(--forest-deep); margin-top:4px;}
+  .summary-cell .value.warn{color:var(--bad);}
+
+  /* ===== Charts ===== */
+  .charts{display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:30px;}
+  .chart-card{background:var(--paper); border:1px solid var(--line); padding:16px 18px;}
+  .chart-card h3{font-size:13px; margin-bottom:10px; color:var(--ink);}
+  .chart-card canvas{max-height:220px;}
+
+  /* ===== Ledger table ===== */
+  .ledger-wrap{background:var(--paper); border:1px solid var(--line); overflow-x:auto;}
+  table.ledger{border-collapse:collapse; width:100%; font-size:12.5px; white-space:nowrap;}
+  table.ledger th{
+    position:sticky; top:0; background:var(--forest); color:var(--cream);
+    text-align:right; padding:8px 10px; font-weight:500; font-size:11.5px;
+    border-right:1px solid #2E4F3F;
+  }
+  table.ledger th:first-child, table.ledger td:first-child{text-align:left; position:sticky; left:0; background:var(--forest); z-index:2;}
+  table.ledger td:first-child{background:#F1ECDB; color:var(--ink); font-weight:600;}
+  table.ledger td{padding:6px 10px; text-align:right; border-bottom:1px solid var(--line); font-family:'IBM Plex Mono',monospace;}
+  table.ledger tr:nth-child(even) td{background:#FBF8EF;}
+  table.ledger td.neg{color:var(--bad);}
+  table.ledger td.bought input{
+    width:70px; text-align:right; border:1px solid var(--line); border-radius:3px; padding:3px 5px;
+    font-family:'IBM Plex Mono',monospace; background:#FFFDF6;
+  }
+  table.ledger td.bought input:focus{outline:2px solid var(--amber); border-color:var(--amber);}
+
+  section.block{margin-bottom:34px;}
+  section.block > h2{font-size:19px; margin-bottom:14px; padding-bottom:8px; border-bottom:2px solid var(--forest);}
+
+  .calc-grid{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
+  .calc-card{background:var(--paper); border:1px solid var(--line); padding:18px 20px;}
+  .calc-card .metric{display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--line); font-size:13.5px;}
+  .calc-card .metric:last-child{border-bottom:none;}
+  .calc-card .metric .v{font-family:'IBM Plex Mono',monospace; font-weight:600; color:var(--forest-deep);}
+
+  .note{font-size:12px; color:var(--ink-soft); font-style:italic; margin-top:6px; line-height:1.5;}
+
+  footer{
+    background:var(--forest-deep); color:#B9CBB9; text-align:center;
+    padding:22px; font-size:12px;
+  }
+
+  @media (max-width: 860px){
+    .layout{flex-direction:column;}
+    aside{width:100%; height:auto; position:relative; border-right:none; border-bottom:1px solid var(--line);}
+    .charts, .calc-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Green Horizon</h1>
+  <span class="tag">egg farming profitability ledger</span>
+  <div class="spacer"></div>
+  <div class="month-input">
+    <label for="numMonths">Months to project</label>
+    <input type="number" id="numMonths" value="60" min="6" max="360" step="1">
+  </div>
+  <button id="resetBtn" title="Reset all assumptions and purchases to defaults">Reset to defaults</button>
+  <button id="exportBtn" title="Download the ledger as a CSV file">Export CSV</button>
+</header>
+
+<div class="layout">
+  <aside id="assumptionsPanel"><!-- populated by JS --></aside>
+
+  <main>
+    <section class="block">
+      <div class="summary-strip" id="summaryStrip"></div>
+      <div class="charts">
+        <div class="chart-card">
+          <h3>Flock size over time</h3>
+          <canvas id="flockChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Cash balance over time</h3>
+          <canvas id="cashChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Monthly Ledger</h2>
+      <p class="note">Type in the "Bought" column for any month to record a chick purchase — everything else recalculates. Every other cell is read-only, computed from your Assumptions.</p>
+      <div class="ledger-wrap">
+        <table class="ledger" id="ledgerTable"></table>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Profitability Calculator</h2>
+      <p class="note">Per-bird lifetime economics, independent of your purchase schedule — driven only by the Assumptions panel.</p>
+      <div class="calc-grid" id="calcGrid"></div>
+    </section>
+  </main>
+</div>
+
+<footer>Green Horizon Ledger — runs entirely in your browser. Nothing is uploaded anywhere; your numbers stay on this device (saved to local browser storage).</footer>
+
+<script>
+/* ============================================================
+   DEFAULTS
+   ============================================================ */
+const DEFAULTS = {
+  loan: 1000000, annualRate: 0.18, loanTerm: 36, payFreq: 3, gracePeriod: 6,
+  purchaseAgeWeeks: 8, layAgeWeeks: 18, cullAgeWeeks: 85, rearingMonths: 2, productiveMonths: 15,
+  mortality: 0.05,
+  purchaseCost: 800, rearingFeedRate: 68.5, feedKgDay: 0.12, feedPriceQuintal: 9000,
+  eggPrice: 18, spentHenPrice: 800, daysMonth: 30.4,
+  laborBracketCost: 6000, laborBracketSize: 1000,
+  existingHouseCap: 800, newHouseCap: 2000, houseRent: 30000,
+  elecBracketCost: 3000, medicalBracketCost: 5000, otherBracketCost: 5000, otherBracketSize: 1000,
+  initialBatch: 800, target: 10000,
+  layCurve: [0.412,0.951,0.964,0.965,0.960,0.952,0.943,0.933,0.920,0.905,0.893,0.878,0.860,0.841,0.819]
+};
+
+const FIELD_GROUPS = [
+  { title: "Loan & financing", fields: [
+    ["loan","Loan amount (Birr)"],
+    ["annualRate","Annual interest rate",true],
+    ["loanTerm","Loan term (months)"],
+    ["payFreq","Payment frequency (months)"],
+    ["gracePeriod","Grace period (months, no payment)"],
+  ]},
+  { title: "Bird timing", fields: [
+    ["rearingMonths","Rearing months (pre-lay)"],
+    ["productiveMonths","Productive months (laying life)"],
+    ["mortality","Rearing mortality",true],
+  ]},
+  { title: "Bird economics", fields: [
+    ["purchaseCost","Purchase cost per pullet (Birr)"],
+    ["rearingFeedRate","Rearing feed intake (g/bird/day)"],
+    ["feedKgDay","Layer feed intake (kg/bird/day)"],
+    ["feedPriceQuintal","Feed price (Birr/quintal)"],
+    ["eggPrice","Egg price (Birr/egg)"],
+    ["spentHenPrice","Spent hen sale price (Birr)"],
+    ["daysMonth","Days per month"],
+  ]},
+  { title: "Labor", fields: [
+    ["laborBracketCost","Labor cost per bracket (Birr/mo)"],
+    ["laborBracketSize","Birds per labor bracket"],
+  ]},
+  { title: "Housing", fields: [
+    ["existingHouseCap","Existing house capacity (birds)"],
+    ["newHouseCap","New rented house capacity (birds)"],
+    ["houseRent","Additional house rent (Birr/mo)"],
+  ]},
+  { title: "Other operating costs", fields: [
+    ["elecBracketCost","Electric & water per bracket (Birr/mo)"],
+    ["medicalBracketCost","Medical per bracket (Birr/mo)"],
+    ["otherBracketCost","Other per bracket (Birr/mo)"],
+    ["otherBracketSize","Birds per bracket"],
+  ]},
+  { title: "Starting flock & goal", fields: [
+    ["initialBatch","Initial batch size (birds)"],
+    ["target","Target flock size"],
+  ]},
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let assumptions = loadJSON("gh_assumptions", JSON.parse(JSON.stringify(DEFAULTS)));
+let bought = loadJSON("gh_bought", {1: DEFAULTS.initialBatch});
+let numMonths = loadJSON("gh_numMonths", 60);
+
+function loadJSON(key, fallback){
+  try{
+    const raw = localStorage.getItem(key);
+    if(!raw) return fallback;
+    return JSON.parse(raw);
+  }catch(e){ return fallback; }
+}
+function persist(){
+  localStorage.setItem("gh_assumptions", JSON.stringify(assumptions));
+  localStorage.setItem("gh_bought", JSON.stringify(bought));
+  localStorage.setItem("gh_numMonths", JSON.stringify(numMonths));
+}
+
+/* ============================================================
+   CORE SIMULATION — mirrors the Excel workbook's formulas exactly
+   ============================================================ */
+function computeLoanSchedule(a, N){
+  const monthlyRate = a.annualRate/12;
+  const periodRate = Math.pow(1+monthlyRate, a.payFreq) - 1;
+  const numInstallmentsTotal = a.loanTerm / a.payFreq;
+  const installmentsAfterGrace = (a.loanTerm - a.gracePeriod) / a.payFreq;
+  const originalPMT = a.loan*periodRate/(1-Math.pow(1+periodRate,-numInstallmentsTotal));
+  let recomputedPMT = originalPMT;
+  if(a.gracePeriod > 0){
+    const balanceAtGraceEnd = a.loan*Math.pow(1+monthlyRate, a.gracePeriod);
+    recomputedPMT = balanceAtGraceEnd*periodRate/(1-Math.pow(1+periodRate,-installmentsAfterGrace));
+  }
+  const balance=[0], payment=[0]; // 1-indexed, index0 unused
+  for(let r=1;r<=N;r++){
+    const prevBal = r===1 ? a.loan : balance[r-1];
+    const accrued = prevBal*(1+monthlyRate);
+    const isGrace = r <= a.gracePeriod;
+    const periodsSinceGrace = r - a.gracePeriod;
+    const isPay = periodsSinceGrace>0 && (periodsSinceGrace % a.payFreq === 0);
+    let pay = 0;
+    if(prevBal > 0 && !isGrace && isPay) pay = Math.min(recomputedPMT, accrued);
+    balance[r] = accrued - pay;
+    payment[r] = pay;
+  }
+  return {balance, payment, recomputedPMT, originalPMT};
+}
+
+function runSimulation(a, boughtMap, N){
+  const feedPriceKg = a.feedPriceQuintal/100;
+  const loanSched = computeLoanSchedule(a, N);
+  const B=[0], C=[0], D=[0], E=[0], F=[0], G=[0], H=[0];
+  const eggsCount=[0], eggRev=[0], henRev=[0], feedCost=[0], rearingCost=[0];
+  const labor=[0], elec=[0], medical=[0], other=[0], rent=[0], netProfit=[0];
+  const cashBefore=[0], spend=[0], cashEnd=[0];
+
+  for(let r=1;r<=N;r++){
+    B[r] = boughtMap[r] || 0;
+    C[r] = (r-a.rearingMonths>=1) ? B[r-a.rearingMonths]*(1-a.mortality) : 0;
+    D[r] = (r-a.productiveMonths>=1) ? C[r-a.productiveMonths] : 0;
+    E[r] = (r===1?0:E[r-1]) + C[r] - D[r];
+    const outflow = (r-a.rearingMonths>=1) ? B[r-a.rearingMonths] : 0;
+    F[r] = (r===1?0:F[r-1]) + B[r] - outflow;
+    G[r] = E[r]+F[r];
+    const priorTotal = r===1 ? G[r] : G[r-1];
+    H[r] = priorTotal<=a.existingHouseCap ? 1 : 1+Math.ceil((priorTotal-a.existingHouseCap)/a.newHouseCap);
+
+    let weighted = 0;
+    for(let age=1; age<=15; age++){
+      const src = r-(age-1);
+      if(src>=1) weighted += C[src]*a.layCurve[age-1];
+    }
+    eggsCount[r] = weighted*a.daysMonth;
+    eggRev[r] = eggsCount[r]*a.eggPrice;
+    henRev[r] = D[r]*a.spentHenPrice;
+    feedCost[r] = eggsCount[r]*a.feedKgDay*feedPriceKg;
+    rearingCost[r] = F[r]*a.rearingFeedRate/1000*a.daysMonth*feedPriceKg;
+    labor[r] = Math.ceil(priorTotal/a.laborBracketSize)*a.laborBracketCost;
+    elec[r] = Math.ceil(priorTotal/a.otherBracketSize)*a.elecBracketCost;
+    medical[r] = Math.ceil(priorTotal/a.otherBracketSize)*a.medicalBracketCost;
+    other[r] = Math.ceil(priorTotal/a.otherBracketSize)*a.otherBracketCost;
+    rent[r] = Math.max(0,H[r]-1)*a.houseRent;
+
+    netProfit[r] = eggRev[r]+henRev[r]-feedCost[r]-rearingCost[r]-labor[r]-elec[r]-medical[r]-other[r]-rent[r]-loanSched.payment[r];
+    cashBefore[r] = (r===1 ? a.loan : cashEnd[r-1]) + netProfit[r];
+    spend[r] = B[r]*a.purchaseCost;
+    cashEnd[r] = cashBefore[r]-spend[r];
+  }
+
+  // summary
+  let targetMonth = null;
+  for(let r=1;r<=N;r++){ if(G[r]>=a.target){ targetMonth=r; break; } }
+  let loanPaidMonth = null;
+  for(let r=1;r<=N;r++){ if(loanSched.balance[r]<=0){ loanPaidMonth=r; break; } }
+  let totalInterest = 0;
+  for(let r=1;r<=N;r++) totalInterest += loanSched.payment[r];
+  totalInterest -= a.loan;
+  const sum = arr => arr.slice(1).reduce((s,v)=>s+v,0);
+
+  return {
+    N, B,C,D,E,F,G,H, eggsCount, eggRev, henRev, feedCost, rearingCost, labor, elec, medical, other, rent,
+    loanPayment: loanSched.payment, loanBalance: loanSched.balance, netProfit, cashBefore, spend, cashEnd,
+    summary: {
+      targetMonth, loanPaidMonth, totalInterest,
+      recomputedPMT: loanSched.recomputedPMT,
+      totalRearingCost: sum(rearingCost), totalFeedCost: sum(feedCost),
+      totalEggs: sum(eggsCount), totalHenRevenue: sum(henRev), totalBought: sum(B),
+      housesAtTarget: targetMonth ? H[targetMonth] : null,
+    }
+  };
+}
+
+function profitabilityCalc(a){
+  const feedPriceKg = a.feedPriceQuintal/100;
+  const overheadPerBird = (a.laborBracketCost+a.elecBracketCost+a.medicalBracketCost+a.otherBracketCost)/a.otherBracketSize;
+  const survival = 1-a.mortality;
+  const breakevenLayRate = (a.feedKgDay*a.daysMonth*feedPriceKg + overheadPerBird) / (a.daysMonth*a.eggPrice);
+  const rearingCostPerBird = a.rearingFeedRate/1000*a.rearingMonths*a.daysMonth*feedPriceKg + overheadPerBird*a.rearingMonths;
+  const fullCommit = a.purchaseCost + rearingCostPerBird;
+
+  let cum = -a.purchaseCost;
+  const trajectory = [{age:0, stage:"Purchase", revenue:0, cost:a.purchaseCost, cum}];
+  for(let age=1; age<=a.rearingMonths; age++){
+    const cost = a.rearingFeedRate/1000*a.daysMonth*feedPriceKg + overheadPerBird;
+    cum += -cost;
+    trajectory.push({age, stage:"Rearing (pre-lay)", revenue:0, cost, cum});
+  }
+  let breakevenAge = null;
+  for(let i=0;i<a.layCurve.length;i++){
+    const age = a.rearingMonths + i + 1;
+    const revenue = survival*a.layCurve[i]*a.daysMonth*a.eggPrice;
+    const cost = survival*(a.feedKgDay*a.daysMonth*feedPriceKg + overheadPerBird);
+    cum += revenue-cost;
+    if(cum>=0 && breakevenAge===null) breakevenAge = age;
+    trajectory.push({age, stage:`Laying (month ${i+1})`, revenue, cost, cum});
+  }
+  const lifetimeProfit = cum + survival*a.spentHenPrice;
+  const roi = lifetimeProfit/fullCommit;
+
+  return {breakevenLayRate, rearingCostPerBird, fullCommit, trajectory, breakevenAge, lifetimeProfit, roi};
+}
+
+/* ============================================================
+   RENDERING
+   ============================================================ */
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const fmtPct = n => (n*100).toFixed(1)+'%';
+
+function renderAssumptionsPanel(){
+  const panel = document.getElementById('assumptionsPanel');
+  panel.innerHTML = '';
+  FIELD_GROUPS.forEach(group=>{
+    const div = document.createElement('div');
+    div.className='field-group';
+    const h3 = document.createElement('h3'); h3.textContent = group.title;
+    div.appendChild(h3);
+    group.fields.forEach(([key,label,isPct])=>{
+      const f = document.createElement('div'); f.className='field';
+      const lab = document.createElement('label'); lab.textContent = label;
+      const inp = document.createElement('input');
+      inp.type='number'; inp.step= isPct ? '0.01' : 'any';
+      inp.value = isPct ? assumptions[key] : assumptions[key];
+      inp.addEventListener('change', ()=>{
+        const v = parseFloat(inp.value);
+        if(!isNaN(v)){ assumptions[key]=v; persist(); renderAll(); }
+      });
+      f.appendChild(lab); f.appendChild(inp);
+      div.appendChild(f);
+    });
+    panel.appendChild(div);
+  });
+
+  // lay curve, collapsible
+  const det = document.createElement('details'); det.className='laycurve';
+  const sum = document.createElement('summary'); sum.textContent='Laying curve (15 months since first lay)';
+  det.appendChild(sum);
+  assumptions.layCurve.forEach((v,i)=>{
+    const f = document.createElement('div'); f.className='field';
+    const lab = document.createElement('label'); lab.textContent = `Month ${i+1} of lay`;
+    const inp = document.createElement('input'); inp.type='number'; inp.step='0.001';
+    inp.value = v;
+    inp.addEventListener('change', ()=>{
+      const val = parseFloat(inp.value);
+      if(!isNaN(val)){ assumptions.layCurve[i]=val; persist(); renderAll(); }
+    });
+    f.appendChild(lab); f.appendChild(inp);
+    det.appendChild(f);
+  });
+  panel.appendChild(det);
+}
+
+let flockChartInstance=null, cashChartInstance=null;
+
+function renderAll(){
+  numMonths = parseInt(document.getElementById('numMonths').value) || 60;
+  persist();
+  const sim = runSimulation(assumptions, bought, numMonths);
+  renderSummary(sim);
+  renderCharts(sim);
+  renderLedger(sim);
+  renderCalculator();
+}
+
+function renderSummary(sim){
+  const s = sim.summary;
+  const cells = [
+    ["Target reached", s.targetMonth ? `Month ${s.targetMonth}` : "Not yet", s.targetMonth ? '' : 'warn'],
+    ["...in years", s.targetMonth ? (s.targetMonth/12).toFixed(1)+' yrs' : '—', ''],
+    ["Loan paid off", s.loanPaidMonth ? `Month ${s.loanPaidMonth}` : "Not yet", s.loanPaidMonth ? '' : 'warn'],
+    ["Total interest paid", fmt(s.totalInterest)+' Birr', ''],
+    ["Payment per installment", fmt(s.recomputedPMT)+' Birr', ''],
+    ["Total chicks bought", fmt(s.totalBought), ''],
+    ["Total eggs sold", fmt(s.totalEggs), ''],
+    ["Houses at target", s.housesAtTarget ?? '—', ''],
+  ];
+  const strip = document.getElementById('summaryStrip');
+  strip.innerHTML = cells.map(([label,value,cls])=>`
+    <div class="summary-cell">
+      <div class="label">${label}</div>
+      <div class="value ${cls}">${value}</div>
+    </div>`).join('');
+}
+
+function renderCharts(sim){
+  const labels = Array.from({length:sim.N}, (_,i)=>i+1);
+  const flockCtx = document.getElementById('flockChart').getContext('2d');
+  const cashCtx = document.getElementById('cashChart').getContext('2d');
+  if(flockChartInstance) flockChartInstance.destroy();
+  if(cashChartInstance) cashChartInstance.destroy();
+
+  flockChartInstance = new Chart(flockCtx, {
+    type:'line',
+    data:{ labels, datasets:[
+      {label:'Total birds', data: sim.G.slice(1), borderColor:'#1B3B2F', backgroundColor:'rgba(27,59,47,0.08)', fill:true, tension:0.15, pointRadius:0, borderWidth:2},
+      {label:'Laying birds', data: sim.E.slice(1), borderColor:'#D9A441', pointRadius:0, borderWidth:2, tension:0.15},
+    ]},
+    options:{ responsive:true, maintainAspectRatio:true, scales:{x:{title:{display:true,text:'Month'}}}, plugins:{legend:{position:'bottom', labels:{boxWidth:12,font:{size:11}}}}}
+  });
+
+  cashChartInstance = new Chart(cashCtx, {
+    type:'line',
+    data:{ labels, datasets:[
+      {label:'Cash end of month', data: sim.cashEnd.slice(1), borderColor:'#8C5A3C', backgroundColor:'rgba(140,90,60,0.08)', fill:true, tension:0.15, pointRadius:0, borderWidth:2},
+    ]},
+    options:{ responsive:true, maintainAspectRatio:true, scales:{x:{title:{display:true,text:'Month'}}}, plugins:{legend:{display:false}}}
+  });
+}
+
+const LEDGER_COLS = [
+  ["Month","month"],["Bought","bought"],["Matured","matured"],["Culled","culled"],
+  ["Laying","laying"],["Rearing","rearing"],["Total","total"],["Houses","houses"],
+  ["Eggs","eggs"],["Egg Rev","eggRev"],["Hen Rev","henRev"],["Feed","feed"],
+  ["Rearing Cost","rearingCost"],["Labor","labor"],["Elec","elec"],["Medical","medical"],
+  ["Other","other"],["Rent","rent"],["Loan Pay","loanPay"],["Loan Bal","loanBal"],
+  ["Net Profit","netProfit"],["Cash Before","cashBefore"],["Spend","spend"],["Cash End","cashEnd"],
+];
+
+function renderLedger(sim){
+  const table = document.getElementById('ledgerTable');
+  let thead = '<thead><tr>'+LEDGER_COLS.map(([label])=>`<th>${label}</th>`).join('')+'</tr></thead>';
+  let rows = '';
+  for(let r=1;r<=sim.N;r++){
+    const vals = {
+      month:r, bought:sim.B[r], matured:Math.round(sim.C[r]), culled:Math.round(sim.D[r]),
+      laying:Math.round(sim.E[r]), rearing:Math.round(sim.F[r]), total:Math.round(sim.G[r]), houses:sim.H[r],
+      eggs:fmt(sim.eggsCount[r]), eggRev:fmt(sim.eggRev[r]), henRev:fmt(sim.henRev[r]), feed:fmt(sim.feedCost[r]),
+      rearingCost:fmt(sim.rearingCost[r]), labor:fmt(sim.labor[r]), elec:fmt(sim.elec[r]), medical:fmt(sim.medical[r]),
+      other:fmt(sim.other[r]), rent:fmt(sim.rent[r]), loanPay:fmt(sim.loanPayment[r]), loanBal:fmt(Math.max(0,sim.loanBalance[r])),
+      netProfit:fmt(sim.netProfit[r]), cashBefore:fmt(sim.cashBefore[r]), spend:fmt(sim.spend[r]), cashEnd:fmt(sim.cashEnd[r]),
+    };
+    rows += '<tr>';
+    LEDGER_COLS.forEach(([label,key])=>{
+      if(key==='bought'){
+        rows += `<td class="bought"><input type="number" value="${sim.B[r]}" data-month="${r}"></td>`;
+      } else if(key==='month'){
+        rows += `<td>${vals.month}</td>`;
+      } else {
+        const negClass = (typeof vals[key]==='string' && vals[key].startsWith('-')) ? ' class="neg"' : '';
+        rows += `<td${negClass}>${vals[key]}</td>`;
+      }
+    });
+    rows += '</tr>';
+  }
+  table.innerHTML = thead + '<tbody>'+rows+'</tbody>';
+
+  table.querySelectorAll('input[data-month]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const m = parseInt(inp.dataset.month);
+      const v = parseFloat(inp.value) || 0;
+      bought[m] = v;
+      persist();
+      renderAll();
+    });
+  });
+}
+
+function renderCalculator(){
+  const calc = profitabilityCalc(assumptions);
+  const grid = document.getElementById('calcGrid');
+  const metricsCard = `
+    <div class="calc-card">
+      <div class="metric"><span>Breakeven lay rate</span><span class="v">${fmtPct(calc.breakevenLayRate)}</span></div>
+      <div class="metric"><span>Cost per bird until laying age</span><span class="v">${fmt(calc.rearingCostPerBird)} Birr</span></div>
+      <div class="metric"><span>Full commit per bird</span><span class="v">${fmt(calc.fullCommit)} Birr</span></div>
+      <div class="metric"><span>Breakeven age (months since purchase)</span><span class="v">${calc.breakevenAge ?? 'never in productive life'}</span></div>
+      <div class="metric"><span>Lifetime profit per bird</span><span class="v">${fmt(calc.lifetimeProfit)} Birr</span></div>
+      <div class="metric"><span>Return on investment</span><span class="v">${fmtPct(calc.roi)}</span></div>
+      <p class="note">Independent of your purchase schedule — this is what ONE bird's life looks like under current Assumptions.</p>
+    </div>`;
+  let tableRows = calc.trajectory.map(t=>`
+    <tr>
+      <td>${t.age}</td><td>${t.stage}</td>
+      <td class="mono">${fmt(t.revenue)}</td><td class="mono">${fmt(t.cost)}</td>
+      <td class="mono ${t.cum<0?'neg':''}">${fmt(t.cum)}</td>
+    </tr>`).join('');
+  const trajCard = `
+    <div class="calc-card" style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+        <thead><tr style="text-align:right;">
+          <th style="text-align:left;">Age</th><th style="text-align:left;">Stage</th>
+          <th>Revenue</th><th>Cost</th><th>Cumulative</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>`;
+  grid.innerHTML = metricsCard + trajCard;
+}
+
+/* ============================================================
+   EXPORT / RESET
+   ============================================================ */
+function exportCSV(){
+  const sim = runSimulation(assumptions, bought, numMonths);
+  const header = LEDGER_COLS.map(c=>c[0]).join(',');
+  const lines = [header];
+  for(let r=1;r<=sim.N;r++){
+    lines.push([
+      r, sim.B[r], Math.round(sim.C[r]), Math.round(sim.D[r]), Math.round(sim.E[r]), Math.round(sim.F[r]),
+      Math.round(sim.G[r]), sim.H[r], Math.round(sim.eggsCount[r]), Math.round(sim.eggRev[r]),
+      Math.round(sim.henRev[r]), Math.round(sim.feedCost[r]), Math.round(sim.rearingCost[r]),
+      Math.round(sim.labor[r]), Math.round(sim.elec[r]), Math.round(sim.medical[r]), Math.round(sim.other[r]),
+      Math.round(sim.rent[r]), Math.round(sim.loanPayment[r]), Math.round(Math.max(0,sim.loanBalance[r])),
+      Math.round(sim.netProfit[r]), Math.round(sim.cashBefore[r]), Math.round(sim.spend[r]), Math.round(sim.cashEnd[r])
+    ].join(','));
+  }
+  const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='green_horizon_ledger.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('exportBtn').addEventListener('click', exportCSV);
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(!confirm('Reset all assumptions and purchases to defaults? This cannot be undone.')) return;
+  assumptions = JSON.parse(JSON.stringify(DEFAULTS));
+  bought = {1: DEFAULTS.initialBatch};
+  numMonths = 60;
+  document.getElementById('numMonths').value = 60;
+  persist();
+  renderAssumptionsPanel();
+  renderAll();
+});
+document.getElementById('numMonths').addEventListener('change', renderAll);
+document.getElementById('numMonths').value = numMonths;
+
+/* ============================================================
+   INIT
+   ============================================================ */
+renderAssumptionsPanel();
+renderAll();
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
